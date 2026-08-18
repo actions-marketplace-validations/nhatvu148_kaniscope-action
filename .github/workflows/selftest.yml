@@ -1,6 +1,11 @@
 # Self-test: run the action in DRY-RUN on this repo's own PRs to validate the
 # full Docker build + runtime path end-to-end (it does NOT post a comment).
 #
+# Deliberately does NOT use `uses: ./`. action.yml now points at the published
+# GHCR image, so `uses: ./` would pull the LAST RELEASE and report green while
+# never executing the code under review. This builds the Dockerfile from the PR
+# and runs that container, which is what a self-test is for.
+#
 # Requires a repo secret named OPENROUTER_API_KEY
 #   (Settings → Secrets and variables → Actions → New repository secret).
 # Note: only runs for same-repo PRs — PRs from forks don't receive secrets.
@@ -22,10 +27,27 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5          # needed so `uses: ./` can find the action
+      - uses: actions/checkout@v5
+
+      - name: Build the image from this PR
+        run: docker build -t kaniscope-selftest:pr .
+
+      # Replicates what the Actions runner hands a Docker action. Inputs arrive
+      # as INPUT_<NAME> upper-cased with HYPHENS PRESERVED, and the entrypoint
+      # resolves the PR number from the event payload, so the event file is
+      # mounted at the path GITHUB_EVENT_PATH points to inside the container.
       - name: Kaniscope review (dry-run)
-        uses: ./
-        with:
-          openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
-          model: moonshotai/kimi-k2-0905
-          dry-run: 'true'
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -e "INPUT_OPENROUTER-API-KEY=${OPENROUTER_API_KEY}" \
+            -e "INPUT_MODEL=moonshotai/kimi-k2-0905" \
+            -e "INPUT_DRY-RUN=true" \
+            -e "INPUT_GITHUB-TOKEN=${{ github.token }}" \
+            -e "GITHUB_REPOSITORY=${{ github.repository }}" \
+            -e "GITHUB_EVENT_NAME=${{ github.event_name }}" \
+            -e "GITHUB_EVENT_PATH=/github/workflow/event.json" \
+            -v "${{ github.event_path }}:/github/workflow/event.json:ro" \
+            kaniscope-selftest:pr
