@@ -70,6 +70,27 @@ jobs:
 Then add your OpenRouter key as a repo secret named `OPENROUTER_API_KEY`
 (**Settings → Secrets and variables → Actions**).
 
+### Runner requirement — Linux **amd64**
+
+Since v0.1.10 this ships as a prebuilt image (`ghcr.io/nhatvu148/kaniscope-action`)
+so your runs pull it in seconds instead of compiling Rust every time. The
+published manifest is **`linux/amd64` only**.
+
+`ubuntu-latest` and every other GitHub-hosted Linux runner is amd64, so the
+snippet above just works. It does **not** run on:
+
+| runner | why |
+|---|---|
+| `ubuntu-24.04-arm` / `ubuntu-22.04-arm` | arm64 — `no matching manifest for linux/arm64` |
+| a self-hosted **ARM** Linux runner | same |
+| macOS or Windows runners | Docker container actions are Linux-only, prebuilt or not |
+
+Earlier versions built the image on the runner, so they followed whatever
+architecture it had. That flexibility is what the speed-up cost. If you need
+arm64, [open an issue](https://github.com/nhatvu148/kaniscope-action/issues) —
+the publish job can emit a multi-arch manifest, at the price of a much slower
+release (Rust cross-compiled under QEMU).
+
 ## Inputs
 
 | Input | Required | Default | Description |

@@ -1,0 +1,61 @@
+# Consumer check: run the action the way a REAL USER runs it.
+#
+# selftest.yml builds the Dockerfile from the PR, which is right for testing the
+# code under review but never touches the path an actual consumer takes:
+#
+#   uses: nhatvu148/kaniscope-action@v1
+#     -> resolve the floating v1 git tag
+#     -> read action.yml from it
+#     -> pull ghcr.io/nhatvu148/kaniscope-action:v1 ANONYMOUSLY
+#     -> run that image
+#
+# Every one of those steps can break without a single test going red: the tag
+# can point at the wrong commit, the package can be private, the manifest can
+# lack the runner's architecture, the image can simply not have been published.
+# All four are invisible to a workflow that builds locally.
+#
+# This job is therefore deliberately pinned to @v1, NOT to `./`. It tests the
+# published artifact, so it is expected to lag the PR — that is the point.
+#
+# Cost: one extra dry-run review per PR (pennies on the default model). To limit
+# it, gate the job on a label:
+#   if: contains(github.event.pull_request.labels.*.name, 'verify-release')
+name: consumer check (published @v1)
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: consumer-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  consumer:
+    # amd64 on purpose: this asserts the published manifest serves the runner
+    # every consumer actually uses.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the image is anonymously pullable for this runner's arch
+        run: |
+          set -euo pipefail
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          echo "runner arch: $(uname -m)"
+          docker pull ghcr.io/nhatvu148/kaniscope-action:v1
+          docker image inspect ghcr.io/nhatvu148/kaniscope-action:v1 \
+            --format 'pulled {{.Os}}/{{.Architecture}} · {{.Size}} bytes'
+
+      # The real consumer entry point. Skipped on workflow_dispatch, where there
+      # is no PR for the engine to resolve from the event payload.
+      - name: Review this PR via the published action
+        if: github.event_name == 'pull_request'
+        uses: nhatvu148/kaniscope-action@v1
+        with:
+          openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
+          dry-run: 'true'
+          comment-marker: '🦀 Kaniscope (consumer check)'
