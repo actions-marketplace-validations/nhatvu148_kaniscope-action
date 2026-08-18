@@ -42,4 +42,8 @@ runs:
   # Published by .github/workflows/publish.yml on version tags. The self-test
   # deliberately does NOT go through this path - it builds the Dockerfile itself,
   # so a PR is tested against its own code rather than the last release.
+  #
+  # The published manifest is linux/amd64 ONLY. ubuntu-latest is amd64 so the
+  # common case is fine, but arm64 runners fail with "no matching manifest".
+  # Building on the runner used to hide this by following its architecture.
   image: 'docker://ghcr.io/nhatvu148/kaniscope-action:v1'
