@@ -21,5 +21,13 @@ jobs:
       packages: write
     with:
       package-name: kaniscope-action
+      # GHCR packages are private by default and action.yml pulls this image
+      # anonymously, so a private package breaks every consumer while this job
+      # still goes green. Fail the release instead.
+      require-public: true
+      # Gated on a version tag. workflow_dispatch has no ref guard, so without
+      # `enable` a manual run from any branch would move the floating :v1 image
+      # tag onto an untagged build - exactly the "tag first, then move v1"
+      # ordering this file's header says is required.
       extra-tags: |
-        type=raw,value=v1
+        type=raw,value=v1,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
