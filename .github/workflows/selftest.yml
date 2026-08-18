@@ -8,7 +8,9 @@
 #
 # Requires a repo secret named OPENROUTER_API_KEY
 #   (Settings → Secrets and variables → Actions → New repository secret).
-# Note: only runs for same-repo PRs — PRs from forks don't receive secrets.
+# Note: the review step is skipped for fork PRs — they don't receive secrets.
+# The image build above still runs, so a fork PR is still checked for
+# compile/build breakage; only the model call is skipped.
 name: self-test (dry-run)
 
 on:
@@ -36,7 +38,11 @@ jobs:
       # as INPUT_<NAME> upper-cased with HYPHENS PRESERVED, and the entrypoint
       # resolves the PR number from the event payload, so the event file is
       # mounted at the path GITHUB_EVENT_PATH points to inside the container.
+      # Fork PRs do not receive secrets, so this would fail on an empty key.
+      # This was previously only a comment at the top of the file, which does
+      # not stop the job going red - it just explains why afterwards.
       - name: Kaniscope review (dry-run)
+        if: github.event.pull_request.head.repo.full_name == github.repository
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
