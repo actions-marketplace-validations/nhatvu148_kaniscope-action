@@ -127,3 +127,9 @@ Dual-licensed under **MIT OR Apache-2.0** (the Rust convention, matching
 prefer. See [LICENSE-MIT](LICENSE-MIT) and [LICENSE-APACHE](LICENSE-APACHE).
 
 © 2026 nhatvu148
+
+## Releasing
+
+See [RELEASING.md](RELEASING.md). The order is load-bearing: tag, wait for the
+image to publish, *then* move the floating `v1` tag. Moving `v1` first leaves
+every consumer on the previous image with nothing failing to tell you.
